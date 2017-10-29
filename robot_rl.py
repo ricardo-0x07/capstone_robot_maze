@@ -62,14 +62,14 @@ class Robot(object):
         self.next_even_greater_bounds.extend([(x, self.maze_dim/2 -5) for x in range(self.maze_dim/2 -5, self.maze_dim/2 +5)])
         self.next_even_greater_bounds.extend([(x, self.maze_dim/2 +4) for x in range(self.maze_dim/2 -5, self.maze_dim/2 +5)])
         self.next_even_greater_bounds = list(set(self.next_even_greater_bounds))
-        # print 'self.next_even_greater_bounds: ', self.next_even_greater_bounds
+        print 'self.next_even_greater_bounds: ', self.next_even_greater_bounds
 
         self.final_even_greater_bounds = [(self.maze_dim/2 -6, y) for y in range(self.maze_dim/2 -6, self.maze_dim/2 +6)]
         self.final_even_greater_bounds.extend([(self.maze_dim/2 +5, y) for y in range(self.maze_dim/2 -6, self.maze_dim/2 +6)])
         self.final_even_greater_bounds.extend([(x, self.maze_dim/2 -6) for x in range(self.maze_dim/2 -6, self.maze_dim/2 +6)])
         self.final_even_greater_bounds.extend([(x, self.maze_dim/2 +5) for x in range(self.maze_dim/2 -6, self.maze_dim/2 +6)])
         self.final_even_greater_bounds = list(set(self.final_even_greater_bounds))
-        # print 'self.final_even_greater_bounds: ', self.final_even_greater_bounds
+        print 'self.final_even_greater_bounds: ', self.final_even_greater_bounds
 
         self.testing = False
         self.previous_action = (0, 0)
@@ -127,14 +127,11 @@ class Robot(object):
                 sense_list.append(value + 1)
         self.valid_actions = []
         if sensors[0] > 0: 
-            self.valid_actions.append((-90, 1))
-            # self.valid_actions.extend([(-90, move) for move in range(1, sense_list[0])])
+            self.valid_actions.extend([(-90, move) for move in range(1, sense_list[0])])
         if sensors[1] > 0: 
-            self.valid_actions.append((0, 1))
-            # self.valid_actions.extend([(0, move) for move in range(1, sense_list[1])])
+            self.valid_actions.extend([(0, move) for move in range(1, sense_list[1])])
         if sensors[2] > 0: 
-            self.valid_actions.append((90, 1))
-            # self.valid_actions.extend([(90, move) for move in range(1, sense_list[2])])
+            self.valid_actions.extend([(90, move) for move in range(1, sense_list[2])])
         if sensors[0] == 0 and sensors[1] == 0 and sensors[2] == 0:
             self.valid_actions.extend([(rotate, 0) for rotate in [-90, 90]])
 
@@ -150,6 +147,7 @@ class Robot(object):
 
         reward = self.act() # Receive a reward
         self.learn(self.state, self.previous_action, reward)   # Q-learn
+        # print "self.robot_pos['location']", self.robot_pos['location']
         # Adjust exploration verses exploitation after hitting the goal
         if self.hit_goal:
             self.adjust()
@@ -218,6 +216,8 @@ class Robot(object):
                     return 5
 
         if self.robot_pos['location'][0] in self.goal_bounds and self.robot_pos['location'][1] in self.goal_bounds:
+            # print "self.robot_pos['location']", self.robot_pos['location']
+            # print 'self.goal_bounds', self.goal_bounds
             self.hit_goal = True
             return 1000
         else:

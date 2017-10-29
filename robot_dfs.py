@@ -31,49 +31,18 @@ class Robot(object):
         self.max_Q = 0.0
         self.rotation = 0
         self.movement = 0
-        self.robot_pos = {'location': [0, 0], 'heading': 'up'}
+        self.robot_pos = {'location': (0, 0), 'heading': 'up'}
         self.to_rotate = {'forward': 0, 'right': 90, 'left': -90}
         self.hit_goal = False
         self.goal_bounds = [self.maze_dim/2 - 1, self.maze_dim/2]
-        self.outer_bounds = [(self.maze_dim/2 -2, y) for y in range(self.maze_dim/2 -2, self.maze_dim/2 +2)]
-
-        self.outer_bounds.extend([(self.maze_dim/2 +1, y) for y in range(self.maze_dim/2 -2, self.maze_dim/2 +2)])
-        self.outer_bounds.extend([(x, self.maze_dim/2 -2) for x in range(self.maze_dim/2 -2, self.maze_dim/2 +2)])
-        self.outer_bounds.extend([(x, self.maze_dim/2 +1) for x in range(self.maze_dim/2 -2, self.maze_dim/2 +2)])
-        self.outer_bounds = list(set(self.outer_bounds))
-        # print 'self.outer_bounds: ', self.outer_bounds
-
-        self.greater_bounds = [(self.maze_dim/2 -3, y) for y in range(self.maze_dim/2 -3, self.maze_dim/2 +3)]
-        self.greater_bounds.extend([(self.maze_dim/2 +2, y) for y in range(self.maze_dim/2 -3, self.maze_dim/2 +3)])
-        self.greater_bounds.extend([(x, self.maze_dim/2 -3) for x in range(self.maze_dim/2 -3, self.maze_dim/2 +3)])
-        self.greater_bounds.extend([(x, self.maze_dim/2 +2) for x in range(self.maze_dim/2 -3, self.maze_dim/2 +3)])
-        self.greater_bounds = list(set(self.greater_bounds))
-        # print 'self.greater_bounds: ', self.greater_bounds
-
-        self.even_greater_bounds = [(self.maze_dim/2 -4, y) for y in range(self.maze_dim/2 -4, self.maze_dim/2 +4)]
-        self.even_greater_bounds.extend([(self.maze_dim/2 +3, y) for y in range(self.maze_dim/2 -4, self.maze_dim/2 +4)])
-        self.even_greater_bounds.extend([(x, self.maze_dim/2 -4) for x in range(self.maze_dim/2 -4, self.maze_dim/2 +4)])
-        self.even_greater_bounds.extend([(x, self.maze_dim/2 +3) for x in range(self.maze_dim/2 -4, self.maze_dim/2 +4)])
-        self.even_greater_bounds = list(set(self.even_greater_bounds))
-        # print 'self.even_greater_bounds: ', self.even_greater_bounds
-
-        self.next_even_greater_bounds = [(self.maze_dim/2 -5, y) for y in range(self.maze_dim/2 -5, self.maze_dim/2 +4)]
-        self.next_even_greater_bounds.extend([(self.maze_dim/2 +4, y) for y in range(self.maze_dim/2 -5, self.maze_dim/2 +5)])
-        self.next_even_greater_bounds.extend([(x, self.maze_dim/2 -5) for x in range(self.maze_dim/2 -5, self.maze_dim/2 +5)])
-        self.next_even_greater_bounds.extend([(x, self.maze_dim/2 +4) for x in range(self.maze_dim/2 -5, self.maze_dim/2 +5)])
-        self.next_even_greater_bounds = list(set(self.next_even_greater_bounds))
-        # print 'self.next_even_greater_bounds: ', self.next_even_greater_bounds
-
-        self.final_even_greater_bounds = [(self.maze_dim/2 -6, y) for y in range(self.maze_dim/2 -6, self.maze_dim/2 +6)]
-        self.final_even_greater_bounds.extend([(self.maze_dim/2 +5, y) for y in range(self.maze_dim/2 -6, self.maze_dim/2 +6)])
-        self.final_even_greater_bounds.extend([(x, self.maze_dim/2 -6) for x in range(self.maze_dim/2 -6, self.maze_dim/2 +6)])
-        self.final_even_greater_bounds.extend([(x, self.maze_dim/2 +5) for x in range(self.maze_dim/2 -6, self.maze_dim/2 +6)])
-        self.final_even_greater_bounds = list(set(self.final_even_greater_bounds))
-        # print 'self.final_even_greater_bounds: ', self.final_even_greater_bounds
 
         self.testing = False
         self.previous_action = (0, 0)
-        self.state = (0, 1, 0, self.robot_pos['heading'], self.robot_pos['location'][0], self.robot_pos['location'][1])
+        self.state = self.robot_pos['location']
+
+        initial_path = ((self.getStartState(), 'up', 0,),)
+        self.frontier = set([initial_path])
+        self.explored = []
 
     def re_init(self):
         '''
@@ -118,48 +87,48 @@ class Robot(object):
         the maze) then returning the tuple ('Reset', 'Reset') will indicate to
         the tester to end the run and return the robot to the start.
         '''
-        # Determine valid actions based on sensor readings 
-        sense_list = []
-        for value in sensors:
-            if value >= 3:
-                sense_list.append(4)
-            else:
-                sense_list.append(value + 1)
-        self.valid_actions = []
-        if sensors[0] > 0: 
-            self.valid_actions.append((-90, 1))
-            # self.valid_actions.extend([(-90, move) for move in range(1, sense_list[0])])
-        if sensors[1] > 0: 
-            self.valid_actions.append((0, 1))
-            # self.valid_actions.extend([(0, move) for move in range(1, sense_list[1])])
-        if sensors[2] > 0: 
-            self.valid_actions.append((90, 1))
-            # self.valid_actions.extend([(90, move) for move in range(1, sense_list[2])])
-        if sensors[0] == 0 and sensors[1] == 0 and sensors[2] == 0:
-            self.valid_actions.extend([(rotate, 0) for rotate in [-90, 90]])
+        # initial_path = ((self.getStartState(), 'up', 0,),)
+        # self.frontier = set([initial_path])
+        # self.explored = []
+        path = tuple()
+        # while True:
+        # if not self.frontier:
+        #     return []
+        path = self.frontier.pop()
+        if path:
+            state = path[len(path) - 1]
+            print 'state: ', state
+        if self.isGoalState(state[0]):
+            self.actions = [action[1] for action in path]
 
-        # Build state
-        self.state = self.build_state(sensors)
-        self.createQ(self.state)                 # Create 'state' in Q-table
-        self.previous_action = self.choose_action(self.state)  # Choose an action
-
-        if self.epsilon <= 0 and not self.testing and self.hit_goal:
-            print 'RESET'
-            self.re_init()
-            return 'Reset', 'Reset'
-
-        reward = self.act() # Receive a reward
-        self.learn(self.state, self.previous_action, reward)   # Q-learn
-        # Adjust exploration verses exploitation after hitting the goal
-        if self.hit_goal:
-            self.adjust()
-            print 'reward', reward
-
-        # Determine updated rotation
-        self.rotation = self.previous_action[0]
-        # Determine updated movement
-        self.movement = self.previous_action[1]
+        self.explored.append(state)
+        actions = self.getSuccessors(state, sensors)
+        frontier_states = [frontier_path[len(frontier_path) - 1] for frontier_path in self.frontier if frontier_path]
+        for action in actions:
+            if action not in self.explored:
+                if action not in frontier_states:
+                    copy = list(path)
+                    copy.append(action)
+                    copy = tuple(copy)
+                    self.frontier.add(copy)
         return self.rotation, self.movement
+
+    def getStartState(self):
+        return ((0,0), 'up', 0,),)
+
+    def isGoalState(self, location):
+        if location[0] in self.goal_bounds and location[1] in self.goal_bounds:
+            self.hit_goal = True
+            return self.hit_goal
+
+    def getSuccessors(self, state, sensors):
+        location = state[0]
+        heading = state[1]
+        successors = []
+        for value in sensors:
+            if value > 0:
+                successors.append(((location[0]+= self.dir_move[heading][0], location[1]+= self.dir_move[heading][1]), self.dir_sensors[heading][0], 1))
+        return successors
 
     def act(self):
         """
@@ -218,6 +187,8 @@ class Robot(object):
                     return 5
 
         if self.robot_pos['location'][0] in self.goal_bounds and self.robot_pos['location'][1] in self.goal_bounds:
+            # print "self.robot_pos['location']", self.robot_pos['location']
+            # print 'self.goal_bounds', self.goal_bounds
             self.hit_goal = True
             return 1000
         else:
