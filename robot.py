@@ -11,6 +11,10 @@ class Robot(object):
         provided based on common information, including the size of the maze
         the robot is placed in.
         '''
+        # List of action to support taking th agent back to the start
+        self.reverse_actions = []
+        self.isReversing = False
+        # Dictionaries to aid navigation
         self.dir_sensors = {'u': ['l', 'u', 'r'], 'r': ['u', 'r', 'd'],
                     'd': ['r', 'd', 'l'], 'l': ['d', 'l', 'u'],
                     'up': ['l', 'u', 'r'], 'right': ['u', 'r', 'd'],
@@ -20,58 +24,38 @@ class Robot(object):
         self.dir_reverse = {'u': 'd', 'r': 'l', 'd': 'u', 'l': 'r',
                     'up': 'd', 'right': 'l', 'down': 'u', 'left': 'r'}
         self.heading = 'up'
+        self.total_time = 0
+        self.run_active = True
+        # Max time to complete both runs
+        self.max_time = 1000
+        # Dimension of the maze
         self.maze_dim = maze_dim
-        self.next_waypoint = None
-        self.valid_actions = ['left', 'forward', 'right']
-        self.destination = None
+        # Valid action list
+        self.valid_actions = []
+        # Learning flag
         self.learning = True
+        # Dictionary for the Q-table value function, where the optimal policy will be accumulated
         self.Q = dict()
+        # Exploration factor used determine what propotion of the time to explore the maze or exploting whats has been learned 
         self.epsilon = 1.0
+        # Learning rate, help determine how much to learn from the result of an action
         self.alpha =0.5
+        # Max Q value 
         self.max_Q = 0.0
-        self.rotation = 0
-        self.movement = 0
         self.robot_pos = {'location': [0, 0], 'heading': 'up'}
-        self.to_rotate = {'forward': 0, 'right': 90, 'left': -90}
+        # Initialize flag for if the agent has reached the goal
         self.hit_goal = False
+        # Initialize goal bounds, used to check if agent reaches goal
         self.goal_bounds = [self.maze_dim/2 - 1, self.maze_dim/2]
-        self.outer_bounds = [(self.maze_dim/2 -2, y) for y in range(self.maze_dim/2 -2, self.maze_dim/2 +2)]
-
-        self.outer_bounds.extend([(self.maze_dim/2 +1, y) for y in range(self.maze_dim/2 -2, self.maze_dim/2 +2)])
-        self.outer_bounds.extend([(x, self.maze_dim/2 -2) for x in range(self.maze_dim/2 -2, self.maze_dim/2 +2)])
-        self.outer_bounds.extend([(x, self.maze_dim/2 +1) for x in range(self.maze_dim/2 -2, self.maze_dim/2 +2)])
-        self.outer_bounds = list(set(self.outer_bounds))
-        # print 'self.outer_bounds: ', self.outer_bounds
-
-        self.greater_bounds = [(self.maze_dim/2 -3, y) for y in range(self.maze_dim/2 -3, self.maze_dim/2 +3)]
-        self.greater_bounds.extend([(self.maze_dim/2 +2, y) for y in range(self.maze_dim/2 -3, self.maze_dim/2 +3)])
-        self.greater_bounds.extend([(x, self.maze_dim/2 -3) for x in range(self.maze_dim/2 -3, self.maze_dim/2 +3)])
-        self.greater_bounds.extend([(x, self.maze_dim/2 +2) for x in range(self.maze_dim/2 -3, self.maze_dim/2 +3)])
-        self.greater_bounds = list(set(self.greater_bounds))
-        # print 'self.greater_bounds: ', self.greater_bounds
-
-        self.even_greater_bounds = [(self.maze_dim/2 -4, y) for y in range(self.maze_dim/2 -4, self.maze_dim/2 +4)]
-        self.even_greater_bounds.extend([(self.maze_dim/2 +3, y) for y in range(self.maze_dim/2 -4, self.maze_dim/2 +4)])
-        self.even_greater_bounds.extend([(x, self.maze_dim/2 -4) for x in range(self.maze_dim/2 -4, self.maze_dim/2 +4)])
-        self.even_greater_bounds.extend([(x, self.maze_dim/2 +3) for x in range(self.maze_dim/2 -4, self.maze_dim/2 +4)])
-        self.even_greater_bounds = list(set(self.even_greater_bounds))
-        # print 'self.even_greater_bounds: ', self.even_greater_bounds
-
-        self.next_even_greater_bounds = [(self.maze_dim/2 -5, y) for y in range(self.maze_dim/2 -5, self.maze_dim/2 +4)]
-        self.next_even_greater_bounds.extend([(self.maze_dim/2 +4, y) for y in range(self.maze_dim/2 -5, self.maze_dim/2 +5)])
-        self.next_even_greater_bounds.extend([(x, self.maze_dim/2 -5) for x in range(self.maze_dim/2 -5, self.maze_dim/2 +5)])
-        self.next_even_greater_bounds.extend([(x, self.maze_dim/2 +4) for x in range(self.maze_dim/2 -5, self.maze_dim/2 +5)])
-        self.next_even_greater_bounds = list(set(self.next_even_greater_bounds))
-        # print 'self.next_even_greater_bounds: ', self.next_even_greater_bounds
-
-        self.final_even_greater_bounds = [(self.maze_dim/2 -6, y) for y in range(self.maze_dim/2 -6, self.maze_dim/2 +6)]
-        self.final_even_greater_bounds.extend([(self.maze_dim/2 +5, y) for y in range(self.maze_dim/2 -6, self.maze_dim/2 +6)])
-        self.final_even_greater_bounds.extend([(x, self.maze_dim/2 -6) for x in range(self.maze_dim/2 -6, self.maze_dim/2 +6)])
-        self.final_even_greater_bounds.extend([(x, self.maze_dim/2 +5) for x in range(self.maze_dim/2 -6, self.maze_dim/2 +6)])
-        self.final_even_greater_bounds = list(set(self.final_even_greater_bounds))
-        # print 'self.final_even_greater_bounds: ', self.final_even_greater_bounds
+        # Initialize list of cells in the goal state, used to compute rewards scaled by distance from goal state
+        self.goal_cells = [(self.maze_dim/2 -1, y) for y in range(self.maze_dim/2 -1, self.maze_dim/2 +1)]
+        self.goal_cells.extend([(self.maze_dim/2 +0, y) for y in range(self.maze_dim/2 -1, self.maze_dim/2 +1)])
+        self.goal_cells.extend([(x, self.maze_dim/2 -1) for x in range(self.maze_dim/2 -1, self.maze_dim/2 +1)])
+        self.goal_cells.extend([(x, self.maze_dim/2 +0) for x in range(self.maze_dim/2 -1, self.maze_dim/2 +1)])
+        self.goal_cells = list(set(self.goal_cells))
 
         self.testing = False
+        self.action = (0, 0)
         self.previous_action = (0, 0)
         self.state = (0, 1, 0, self.robot_pos['heading'], self.robot_pos['location'][0], self.robot_pos['location'][1])
 
@@ -80,21 +64,27 @@ class Robot(object):
         Use the re-initialization function to set up attributes that your robot
         will use to navigate the maze. .
         '''
+        self.total_time = 0
+        self.previous_action = (0, 0)
         self.heading = 'up'
         self.epsilon = 0.0
         self.alpha = 0.0
-        self.next_waypoint = None
         self.valid_actions = ['left', 'forward', 'right']
-        self.destination = None
         self.learning = True
         self.max_Q = 0.0
-        self.rotation = 0
-        self.movement = 0
         self.robot_pos = {'location': [0, 0], 'heading': 'up'}
-        self.to_rotate = {'forward': 0, 'right': 90, 'left': -90}
         self.hit_goal = False
         self.testing = True
+        self.action = (0, 0)
+        self.state = (0, 1, 0, self.robot_pos['heading'], self.robot_pos['location'][0], self.robot_pos['location'][1])
+
+    def reset(self):
+        '''
+        Use the reset parameters after the agent has reversed to the start to explore more possible paths
+        '''
         self.previous_action = (0, 0)
+        self.robot_pos = {'location': [0, 0], 'heading': 'up'}
+        self.hit_goal = False
         self.state = (0, 1, 0, self.robot_pos['heading'], self.robot_pos['location'][0], self.robot_pos['location'][1])
 
     def next_move(self, sensors):
@@ -118,113 +108,166 @@ class Robot(object):
         the maze) then returning the tuple ('Reset', 'Reset') will indicate to
         the tester to end the run and return the robot to the start.
         '''
-        # Determine valid actions based on sensor readings 
-        sense_list = []
-        for value in sensors:
-            if value >= 3:
-                sense_list.append(4)
-            else:
-                sense_list.append(value + 1)
-        self.valid_actions = []
-        if sensors[0] > 0: 
-            self.valid_actions.append((-90, 1))
-            # self.valid_actions.extend([(-90, move) for move in range(1, sense_list[0])])
-        if sensors[1] > 0: 
-            self.valid_actions.append((0, 1))
-            # self.valid_actions.extend([(0, move) for move in range(1, sense_list[1])])
-        if sensors[2] > 0: 
-            self.valid_actions.append((90, 1))
-            # self.valid_actions.extend([(90, move) for move in range(1, sense_list[2])])
-        if sensors[0] == 0 and sensors[1] == 0 and sensors[2] == 0:
-            self.valid_actions.extend([(rotate, 0) for rotate in [-90, 90]])
+        self.total_time += 1
+        if self.hit_goal and not self.testing:
+            self.adjust()
+        if self.epsilon <= 0 and not self.testing:
+            self.run_active = False
+            self.isReversing = False
+            self.re_init()
+            return 'Reset', 'Reset'
+        if self.isReversing:
+            print 'self.isReversing'
+            action = self.reverse()
+        else:
+            action = self.forward(sensors)
+        self.previous_action = action
+
+        return action[0], action[1]
+
+    def forward(self, sensors):
+        """
+        Drives the agent forward towards the goal
+        sensors: inputs are a list of three distances from the robot's left, front, and
+        right-facing sensors, in that order.
+        return: action for the next move
+        """
+        # Determine valid actions based on sensor readings
+        self.valid_actions = self.get_valid_actions(sensors)
 
         # Build state
         self.state = self.build_state(sensors)
         self.createQ(self.state)                 # Create 'state' in Q-table
-        self.previous_action = self.choose_action(self.state)  # Choose an action
+        action = self.choose_action(self.state)  # Choose an action
+        reverse_action1 = None
+        reverse_action2 = None
+        action_list = []
+        if action[0] != 0:
+            action_list.append((action[0]* -1, 0))
+        if action[1] != 0:
+            action_list.append((0, action[1]*-1))
+        reverse_action1 = (0, action[1]*-1)
+        reverse_action2 = (action[0]* -1, 0)
+        action_list = [reverse_action2, reverse_action1] 
+        self.reverse_actions.extend(action_list)
 
-        if self.epsilon <= 0 and not self.testing and self.hit_goal:
-            print 'RESET'
-            self.re_init()
-            return 'Reset', 'Reset'
+        reward = self.act(self.previous_action) # Receive a reward
+        # print 'reward', reward
+        self.learn(self.state, action, reward)   # Q-learn
+        return action
 
-        reward = self.act() # Receive a reward
-        self.learn(self.state, self.previous_action, reward)   # Q-learn
-        # Adjust exploration verses exploitation after hitting the goal
-        if self.hit_goal:
-            self.adjust()
-            print 'reward', reward
+    def reverse(self):
+        """
+        Reverse the agent to the start.
+        return: action for the next reverse move
+        """
+        self.hit_goal = False
+        action = (0,0)
+        if len(self.reverse_actions) == 0:
+            self.isReversing = False
+            self.reset()
+            return action
+        action = self.reverse_actions.pop(len(self.reverse_actions) -1)
+        return action
 
-        # Determine updated rotation
-        self.rotation = self.previous_action[0]
-        # Determine updated movement
-        self.movement = self.previous_action[1]
-        return self.rotation, self.movement
-
-    def act(self):
+    def act(self, action):
         """
         Update location and heading based on intended rotation and movement. 
         Reward the agent for reaching goal and penalize them every other time.
         """
         # Determine current heading
         # perform rotation
-        if self.rotation == -90:
+        rotation = action[0]
+        if rotation == -90:
             self.robot_pos['heading'] = self.dir_sensors[self.robot_pos['heading']][0]
-        elif self.rotation == 90:
+        elif rotation == 90:
             self.robot_pos['heading'] = self.dir_sensors[self.robot_pos['heading']][2]
-        elif self.rotation == 0:
+        elif rotation == 0:
             pass
         else:
             print "Invalid rotation value, no rotation performed."
-        movement = self.movement
+        movement = action[1]
         while movement != 0:
-            if self.movement > 0:
+            if movement > 0:
                 self.robot_pos['location'][0] += self.dir_move[self.robot_pos['heading']][0]
                 self.robot_pos['location'][1] += self.dir_move[self.robot_pos['heading']][1]
                 movement -= 1
-        for item in self.outer_bounds:
-            if self.robot_pos['location'][0] == item[0] and self.robot_pos['location'][1] == item[1]:
-                if self.movement < 1:
-                    return -1000
-                else:
-                    return 100
-
-        for item in self.greater_bounds:
-            if self.robot_pos['location'][0] == item[0] and self.robot_pos['location'][1] == item[1]:
-                if self.movement < 1:
-                    return -1000
-                else:
-                    return 20
-
-        for item in self.even_greater_bounds:
-            if self.robot_pos['location'][0] == item[0] and self.robot_pos['location'][1] == item[1]:
-                if self.movement < 1:
-                    return -1000
-                else:
-                    return 15
-
-        for item in self.next_even_greater_bounds:
-            if self.robot_pos['location'][0] == item[0] and self.robot_pos['location'][1] == item[1]:
-                if self.movement < 1:
-                    return -1000
-                else:
-                    return 10
-
-        for item in self.final_even_greater_bounds:
-            if self.robot_pos['location'][0] == item[0] and self.robot_pos['location'][1] == item[1]:
-                if self.movement < 1:
-                    return -1000
-                else:
-                    return 5
-
+        # print "self.robot_pos['location']", self.robot_pos['location']
         if self.robot_pos['location'][0] in self.goal_bounds and self.robot_pos['location'][1] in self.goal_bounds:
             self.hit_goal = True
+            return 10000
+        elif action[1] > 0:
+            total = 0.0
+            score = 0.0
+            for cell in self.goal_cells:
+                total += (cell[0]-self.robot_pos['location'][0])**2 + (cell[1]-self.robot_pos['location'][0])**2
+            score = 100*(len(self.goal_cells)/total)
+            # print 'len(self.goal_cells)', len(self.goal_cells)
+            # print 'total', total
+            # print 'score', score
+            return score
+        elif action[1] < 1:
+            return -1000
+
+    def check_reward(self, action):
+        """
+        Checks rewards for possible actions.
+        action: a possible action
+        return: reward value based on possible action
+        """
+        location = [self.robot_pos['location'][0], self.robot_pos['location'][1]]
+        movement = action[1]
+        while movement > 0:
+            if movement > 0:
+                location[0] += self.dir_move[self.robot_pos['heading']][0]
+                location[1] += self.dir_move[self.robot_pos['heading']][1]
+                movement -= 1
+        if location[0] in self.goal_bounds and location[1] in self.goal_bounds:
             return 1000
-        else:
-            if self.movement > 0:
-                return -1
+        elif action[1] > 0:
+            total = 0
+            score = 0
+            for cell in self.goal_cells:
+                total += (cell[0]- location[0])**2 + (cell[1]- location[0])**2
+            score = 1000/(total/len(self.goal_cells))
+            return score
+        elif action[1] < 1:
+            return -1000
+
+    def get_valid_actions(self, sensors):
+        """
+        Determines valid actions.
+        sensors: tuple of sensor values.
+        valid_actions: list of valid actions.
+        """
+        sense_list = []
+        for value in sensors:
+            if value >= 3:
+                sense_list.append(4)
             else:
-                return -10
+                sense_list.append(value + 1)
+        valid_actions = []
+        if sensors[0] > 0: 
+            # valid_actions.append((-90, 1))
+            value1 = 3
+            if sensors[0] < 3:
+                value1 = sensors[0]
+            valid_actions.extend([(-90, move) for move in range(1,value1+1)])
+        if sensors[1] > 0: 
+            # valid_actions.append((0, 1))
+            value2 = 3
+            if sensors[1] < 3:
+                value2 = sensors[1]
+            valid_actions.extend([(0, move) for move in range(1,value2+1)])
+        if sensors[2] > 0: 
+            # valid_actions.append((90, 1))
+            value3 = 3
+            if sensors[2] < 3:
+                value3 = sensors[2]
+            valid_actions.extend([(90, move) for move in range(1,value3+1)])
+        if sensors[0] == 0 and sensors[1] == 0 and sensors[2] == 0:
+            valid_actions.extend([(rotate, 0) for rotate in [-90, 90]])
+        return   valid_actions      
 
     def adjust(self, destination=None, testing=False):
         """ The reset function is called at the beginning of each trial.
@@ -233,7 +276,7 @@ class Robot(object):
 
         # Update epsilon using a decay function of your choice
         if self.epsilon > 0.0:
-            self.epsilon = self.epsilon - 0.1
+            self.epsilon = self.epsilon - 0.5
         # Update additional class parameters as needed
         # If 'testing' is True, set epsilon and alpha to 0
         if self.testing == True:
@@ -242,9 +285,19 @@ class Robot(object):
         return True
 
     def build_state(self, sensors):
+        """
+        Builds the state for the current locations and sensor readings.
+        sensors: tuple of sensor readings for current location.
+        return: built state.
+        """
         return (sensors[0], sensors[1], sensors[2], self.robot_pos['heading'], self.robot_pos['location'][0], self.robot_pos['location'][1])
 
     def get_maxQ(self, state):
+        """
+        Determines the maximum q-value for the possible actions from a state.
+        state: state object.
+        returns: the max value for all of a state's possible actions.
+        """
         if state in self.Q:
             stateQValues = [self.Q[state][action] for action in self.valid_actions if action in self.Q[state]]
             a = np.array(stateQValues)
@@ -253,6 +306,10 @@ class Robot(object):
         return self.max_Q
 
     def createQ(self, state):
+        """
+        Initializes state dictionaries in the q-table.
+        state: state object.abs.
+        """
         if self.learning == True:
             if state not in self.Q:
                 self.Q[state] = {}
@@ -260,26 +317,57 @@ class Robot(object):
                     self.Q[state][action] = 0.0
         return
 
-    def choose_action(self, state, action=None):
+    def choose_action(self, state):
+        """
+        Chooses an action for the next move.
+        state: current state object.
+        return action of the the next move.
+        """
         self.state = state
         if self.learning:
             number = random.random()
             if number <= self.epsilon:
-                # print 'random_actions'
-                action = random.choice(self.valid_actions)
+                reward_values = [self.check_reward(action) for action in self.valid_actions]
+                a = np.array(reward_values)
+                if len(a) > 0:
+                    max_reward = a[np.argmax(a)]
+                possible_actions = [action for action in self.valid_actions if self.check_reward(action) >= max_reward]
+                if len(possible_actions) > 0:
+                    action = random.choice(possible_actions)
+                    return action
+                else:
+                    action = random.choice(self.valid_actions)
+                    return action
             else:
-                # print 'possible_actions'
                 possible_actions = [action for action in self.valid_actions if action in self.Q[state] and self.Q[state][action] >= self.get_maxQ(state)]
                 if len(possible_actions) > 0:
                     action = random.choice(possible_actions)
+                    return action
                 else:
-                    action = random.choice(self.valid_actions)
+                    reward_values = [self.check_reward(action) for action in self.valid_actions]
+                    a = np.array(reward_values)
+                    if len(a) > 0:
+                        max_reward = a[np.argmax(a)]
+                    possible_actions = [action for action in self.valid_actions if self.check_reward(action) >= max_reward]
+                    if len(possible_actions) > 0:
+                        action = random.choice(possible_actions)
+                        return action
+                    else:
+                        action = random.choice(self.valid_actions)
+                        return action
         else:
             action = random.choice(self.valid_actions)
-        return action
+            return action
 
     def learn(self, state, action, reward):
+        """
+        Updates the Qtable dictionary.
+        state: state object.
+        action: choosen action.
+        reward for choosen action.
+        """
         maxQ = self.get_maxQ(state)
         if self.learning == True and state in self.Q and action in self.Q[state] and self.alpha > 0:
             updated_reward = reward * self.alpha + maxQ * (1 - self.alpha)
             self.Q[state][action] = updated_reward
+        return
