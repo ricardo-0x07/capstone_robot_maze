@@ -3,8 +3,9 @@
 
 ### Install
 
-This project requires **Python 2.7 and Numpy** with the [pygame](https://www.pygame.org/wiki/GettingStarted
-) library installed
+This project requires the following 
+**Python 2.7** 
+**Numpy** 
 
 ### Code
 
