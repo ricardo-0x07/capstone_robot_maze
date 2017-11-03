@@ -1,5 +1,5 @@
 from maze import Maze
-from robot import Robot
+from dfs_robot import Robot
 import sys
 
 # global dictionaries for robot movement and sensing
@@ -75,7 +75,7 @@ if __name__ == '__main__':
             elif rotation == 0:
                 pass
             else:
-                print "Invalid rotation value, no rotation performed."
+                print 'Invalid rotation value, no rotationx performed.', rotation
 
             # perform movement
             if abs(movement) > 3:
