@@ -1,5 +1,5 @@
 from maze import Maze
-from dfs_robot import Robot
+from bfs_robot import Robot
 import sys
 
 # global dictionaries for robot movement and sensing
@@ -13,7 +13,7 @@ dir_reverse = {'u': 'd', 'r': 'l', 'd': 'u', 'l': 'r',
                'up': 'd', 'right': 'l', 'down': 'u', 'left': 'r'}
 
 # test and score parameters
-max_time = 10000
+max_time = 1000
 train_score_mult = 1/30.
 
 if __name__ == '__main__':
