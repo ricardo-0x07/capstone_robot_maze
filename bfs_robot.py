@@ -103,14 +103,23 @@ class Robot(object):
             self.update(sensors, self.path, self.state)
             self.state, self.path = self.get_next_state()
             self.new_path_previous_state = self.path[len(self.path)-2]
-            self.switch_paths(self.previous_path, self.path)
-        if self.robot_pos['location'][0] == self.new_path_previous_state[0][0] and self.robot_pos['location'][1] == self.new_path_previous_state[0][1] and (self.robot_pos['heading'][:1] == self.new_path_previous_state[1] or self.robot_pos['heading'] == self.new_path_previous_state[1]):
+        
+        if self.robot_pos['location'][0] == self.new_path_previous_state[0][0] and self.robot_pos['location'][1] == self.new_path_previous_state[0][1] and self.robot_pos['heading'] == self.new_path_previous_state[1]:
             self.isReversing = False
             action = self.state[2]
             rotation = action[0]
             movement = action[1]
             self.previous_path = list(self.path)
             self.act(action)
+            for pstate in self.previous_path:
+                action = pstate[2]
+                reverse_action1 = None
+                reverse_action2 = None
+                action_list = []
+                reverse_action1 = (0, action[1]*-1)
+                reverse_action2 = (action[0]* -1, 0)
+                action_list = [reverse_action2, reverse_action1]
+                self.reverse_actions.extend(action_list)
             return rotation, movement
         else:
             self.isReversing = True
@@ -118,34 +127,6 @@ class Robot(object):
             rotation = action[0]
             movement = action[1]
             return rotation, movement
-    
-    def getIndexOfState(self, previous_path, current_path):
-        for less in range(1, len(previous_path)+1):
-            state = previous_path[len(previous_path) - less]
-            for index, item in enumerate(current_path):
-                if item[0][0] == state[0][0] and item[0][1] == state[0][1] and item[1] == state[1] and item[2][0] == state[2][0] and item[2][1] == state[2][1]:
-                    return index
-        return -1
-    def switch_paths(self, previous_path, current_path):
-        """
-        """
-        index = self.getIndexOfState(previous_path, current_path)
-        path_section = current_path[index-1:len(current_path)-1]
-        self.reverse_actions = []
-        for less in range(1, len(path_section)+1):
-            state = path_section[len(path_section) - less]
-            self.reverse_actions.append(state[2])
-        for pstate in self.previous_path[index-1:]:
-            action = pstate[2]
-            reverse_action1 = None
-            reverse_action2 = None
-            action_list = []
-            reverse_action1 = (0, action[1]*-1)
-            reverse_action2 = (action[0]* -1, 0)
-            action_list = [reverse_action2, reverse_action1]
-            self.reverse_actions.extend(action_list)
-
-
                 
     def reverse(self):
         """
@@ -192,7 +173,7 @@ class Robot(object):
         return: path: lists of states from start to current state,  State: explored state/current state. 
         """
         path = tuple()
-        sorted_frontier = sorted(self.frontier,key=len, reverse=True)
+        sorted_frontier = sorted(self.frontier,key=len, reverse=False)
         path = sorted_frontier.pop()
         self.frontier.remove(path)
 
@@ -269,7 +250,7 @@ class Robot(object):
             successors.append((tuple(location),heading,(-90, 1)))
         if sensors[1] > 0: 
             location = list(state[0])
-            heading = self.dir_sensors[state[1]][1]
+            heading = state[1]
             location[0] += self.dir_move[heading][0]
             location[1] += self.dir_move[heading][1]
             successors.append((tuple(location),heading,(0, 1)))
