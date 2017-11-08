@@ -5,7 +5,7 @@ import sys
 
 
 class Robot(object):
-    def __init__(self, maze_dim):
+    def __init__(self, maze_dim, astar=True, path_weight=1, estimate_weight=22):
         '''
         Use the initialization function to set up attributes that your robot
         will use to learn and navigate the maze. Some initial attributes are
@@ -15,6 +15,9 @@ class Robot(object):
         # List of action to support taking th agent back to the start
         self.reverse_actions = []
         self.isReversing = False
+        self.astar = astar
+        self.path_weight = path_weight
+        self.estimate_weight = estimate_weight
         # Dictionaries to aid navigation
         self.dir_sensors = {'u': ['l', 'u', 'r'], 'r': ['u', 'r', 'd'],
                     'd': ['r', 'd', 'l'], 'l': ['d', 'l', 'u'],
@@ -47,14 +50,11 @@ class Robot(object):
         self.testing = False
         self.previous_action = (0, 0)
         self.count = 0
-
         self.action = (0, 0)
         self.robot_pos = {'location': [0, 0], 'heading': 'up'}
         self.state = (tuple(self.robot_pos['location']))
-        # self.state = (tuple(self.robot_pos['location']), self.robot_pos['heading'], self.action)
         self.explored = []
         initial_path = (self.getStartStateLocation(),)
-        # initial_path = ((self.getStartStateLocation(), 'up', self.action,),)
         self.frontier = set()
         self.previous_path = [self.state]
         self.path = tuple(initial_path)
@@ -94,23 +94,24 @@ class Robot(object):
         the maze) then returning the tuple ('Reset', 'Reset') will indicate to
         the tester to end the run and return the robot to the start.
         '''
-        self.count += 1
-        # if self.count >20:
-        #     sys.exit()
         if self.isGoalState(self.robot_pos['location']):
             self.path = list(self.path[1:])
             self.re_init()
             return 'Reset', 'Reset'
+
         if self.testing:
             action = self.navigate()
             self.act(action)
             return action[0], action[1]
 
         if not self.isReversing:
-            self.update(sensors, self.path, self.state)
-            self.state, self.path = self.get_next_state()
+            if self.astar:
+                self.state, self.path = self.perform_astar(sensors)
+            else:
+                self.state, self.path = self.perform_bfs(sensors)
             self.new_path_previous_state = self.path[len(self.path)-2]
             self.switch_paths(self.previous_path, self.path)
+
         if self.robot_pos['location'][0] == self.new_path_previous_state[0] and self.robot_pos['location'][1] == self.new_path_previous_state[1] :
             self.isReversing = False
             action = self.compute_next_action(self.state)
@@ -126,9 +127,6 @@ class Robot(object):
             rotation = action[0]
             movement = action[1]
             return rotation, movement
-
-    def get_path_cost(self, actions):
-        return len(actions)
 
     def compute_action(self, successor, predecessor=None):
         index = self.dir_sensors[predecessor[1]].index(successor[1][:1])
@@ -162,7 +160,6 @@ class Robot(object):
         else:
             new_heading = predecessor['heading']
 
-        movement = 0
         if new_heading == 'u':
             move = successor[1] - predecessor['location'][1]
 
@@ -183,19 +180,32 @@ class Robot(object):
             move = move * -1
         return rotation, move
 
-    def get_manhattan_cost_to_goal(self,location):
-        total = 0
-        cost = 0
-        D = 1
-        # for cell in self.goal_cells:
-        #     dx = abs(cell[0]- location[0])
-        #     dy = abs(cell[1]- location[1])
-        #     total += (dx + dy)
-        dx = abs(self.maze_dim/2- location[0])
-        dy = abs(self.maze_dim/2- location[0])
-        # cost = D * (total/len(self.goal_cells))
-        cost = D * (dx + dy)
-        return cost        
+    def compute_next_sim_action(self, successor, predecessor=None, heading='u'):
+        if predecessor == None:
+            predecessor = self.robot_pos
+        move = 0
+        if predecessor[0] > successor[0]:
+            new_heading = 'l'
+            move = predecessor[0] - successor[0]
+        elif predecessor[0] < successor[0]:
+            new_heading = 'r'
+            move = successor[0] - predecessor[0]
+        elif predecessor[1] > successor[1]:
+            new_heading = 'd'
+            move = predecessor[1] - successor[1]
+        elif predecessor[1] < successor[1]:
+            new_heading = 'u'
+            move = successor[1] - predecessor[1]
+        else:
+            new_heading = heading
+
+        if new_heading in self.dir_sensors[heading]:
+            index = self.dir_sensors[heading].index(new_heading)
+            rotation = self.dir_rotation[heading][index]
+        else:
+            rotation = 0
+            move = move * -1
+        return rotation, move, heading
 
     def getIndexOfState(self, previous_path, current_path):
         for less in range(1, len(previous_path)+1):
@@ -218,7 +228,6 @@ class Robot(object):
             self.switch_path.append(state)
 
         self.switch_path = self.switch_path[:len(self.switch_path)-1]
-        
 
     def reverse(self):
         """
@@ -256,51 +265,6 @@ class Robot(object):
                 self.robot_pos['location'][1] += self.dir_move[rev_heading][1]
                 movement += 1
 
-    def get_next_state(self):
-        """
-        Retrieve the deepest path and it's frontier state from the frontier.
-        path: list of states on a path.
-        state: explored state/current state.
-        return: path: lists of states from start to current state,  State: explored state/current state. 
-        """
-        path = tuple()
-
-        previous_a_star = 999999
-        sorted_frontier = sorted(self.frontier,key=len, reverse=False)
-
-        for next_path in self.frontier:
-            current_action_cost = self.get_manhattan_cost_to_goal(next_path[len(next_path)-1])
-            current_a_star =  current_action_cost + len(next_path)
-            if current_a_star <= previous_a_star:
-                previous_a_star = current_a_star
-                path = next_path
-        if path:
-            self.frontier.remove(path)
-            state = path[len(path) - 1]
-            return state, path
-
-    def update(self, sensors, path, state):
-        """
-        Update the list of explored and frontier states.
-        sensors: a list of three distances from the robot's left, front, and
-        right-facing sensors, in that order.
-        path: list of states on a path.
-        state: explored state/current state.
-        return: path: lists of states from start to current state,  State: explored state/current state. 
-        """
-        self.explored.append(state)
-        self.successors = self.getSuccessors(self.robot_pos, sensors)
-        frontier_states = [frontier_path[len(frontier_path) - 1]
-                            for frontier_path in self.frontier if frontier_path]
-        for successor in self.successors:
-            if successor not in self.explored:
-                if successor not in frontier_states:
-                    copy = list(path)
-                    copy.append(successor)
-                    copy = tuple(copy)
-                    self.frontier.add(copy)
-        return state, path
-
     def navigate(self):
         """
         Navigate the agent to the goal.
@@ -326,6 +290,28 @@ class Robot(object):
             return True
         else:
             return False
+
+    def update(self, sensors, path, state):
+        """
+        Update the list of explored and frontier states.
+        sensors: a list of three distances from the robot's left, front, and
+        right-facing sensors, in that order.
+        path: list of states on a path.
+        state: explored state/current state.
+        return: path: lists of states from start to current state,  State: explored state/current state. 
+        """
+        self.explored.append(state)
+        self.successors = self.getSuccessors(self.robot_pos, sensors)
+        frontier_states = [frontier_path[len(frontier_path) - 1]
+                            for frontier_path in self.frontier if frontier_path]
+        for successor in self.successors:
+            if successor not in self.explored:
+                if successor not in frontier_states:
+                    copy = list(path)
+                    copy.append(successor)
+                    copy = tuple(copy)
+                    self.frontier.add(copy)
+        return state, path
 
     def getSuccessors(self, robot_pos, sensors):
         """
@@ -372,3 +358,96 @@ class Robot(object):
             successors.append((tuple(location)))
             # successors.append((tuple(location),heading))
         return   successors      
+
+    #### A STAR  SEARCH ###
+    def perform_astar(self, sensors):
+        """
+        Search the node that has the lowest combined cost and heuristic first.
+        path: list of states on a path.
+        state: explored state/current state.
+        return: path: lists of states from start to current state,  State: explored state/current state. 
+        """
+        self.update(sensors, self.path, self.state)
+        return self.get_next_astar_state()
+        
+    def get_manhattan_cost_to_goal(self,location):
+        """
+        Compute the manhattan cost from a location to the goal.
+        location: tuple of the coordinates for the location in the maze.
+        return: the computed cost value.
+        """
+        total = 0
+        cost = 0
+        # D = 22
+        for cell in self.goal_cells:
+            dx = abs(cell[0]- location[0])
+            dy = abs(cell[1]- location[1])
+            total += (dx + dy)
+        cost = self.estimate_weight * (total/len(self.goal_cells))
+        return cost        
+
+    def get_path_cost(self, path):
+        cost = 0
+        length = len(path)
+        window_size = 2
+        nb_pairs = length - window_size
+        heading = 'u'
+        for pair_marker in range(nb_pairs):
+            pair = path[pair_marker:pair_marker + window_size]
+            rotation, move, heading = self.compute_next_sim_action(pair[1], pair[0], heading=heading)
+            if rotation == 0:
+                cost += 1
+            else:
+                cost += self.path_weight
+        return cost
+
+    def get_next_astar_state(self):
+        """
+        Search the node that has the lowest combined cost and heuristic first.
+        path: list of states on a path.
+        state: explored state/current state.
+        return: path: lists of states from start to current state,  State: explored state/current state. 
+        """
+        path = tuple()
+        state = (0,0)
+
+        previous_a_star = 999999
+        sorted_frontier = sorted(self.frontier,key=len, reverse=False)
+
+        for next_path in self.frontier:
+            current_action_cost = self.get_manhattan_cost_to_goal(next_path[len(next_path)-1])
+            current_a_star =  current_action_cost + self.get_path_cost(next_path)
+            if current_a_star <= previous_a_star:
+                previous_a_star = current_a_star
+                path = next_path
+        if path:
+            self.frontier.remove(path)
+            state = path[len(path) - 1]
+        return state, path
+    
+    ### BREADTH FIRST SEARCH ###
+    def perform_bfs(self, sensors):
+        """
+        Search the shallowest nodes in the search tree first.
+        path: list of states on a path.
+        state: explored state/current state.
+        return: path: lists of states from start to current state,  State: explored state/current state. 
+        """
+        self.update(sensors, self.path, self.state)
+        return self.get_next_bfs_state()
+    def get_next_bfs_state(self):
+        """
+        Search the shallowest nodes in the search tree first.
+        path: list of states on a path.
+        state: explored state/current state.
+        return: path: lists of states from start to current state,  State: explored state/current state. 
+        """
+        path = tuple()
+        sorted_frontier = sorted(self.frontier,key=len, reverse=False)
+        path = sorted_frontier.pop()
+        self.frontier.remove(path)
+
+        if path:
+            state = path[len(path) - 1]
+        return state, path
+
